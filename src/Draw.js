@@ -6,6 +6,7 @@ const TriangleCanvas = () => {
   const [vertices, setVertices] = useState([]);
   const [triangles, setTriangles] = useState([]);
   const [vertexColors, setVertexColors] = useState(['#000000', '#000000', '#000000']);
+  const [vertexColorsAux, setVertexColorsAux] = useState(['#000000', '#000000', '#000000']);
   const [edgeColor, setEdgeColor] = useState('#000000');
 
   const drawTriangle = (ctx, triangle) => {
@@ -20,8 +21,144 @@ const TriangleCanvas = () => {
       ctx.lineWidth = 2;
       ctx.strokeStyle = triangle.edgeColor;
       ctx.stroke();
+      fillPoly(ctx, triangle)
     }
   };
+
+  const fillPoly = (ctx, triangle) => {
+    if (triangle.vertices && triangle.vertices.length === 3) {
+      triangle.vertices.sort((a, b) => a.y - b.y);
+
+      let v0 = triangle.vertices[0], v1 = triangle.vertices[1], v2 = triangle.vertices[2]
+      const v0color = hexToRgb(vertexColors[0])
+      const v1color = hexToRgb(vertexColors[1])
+      const v2color = hexToRgb(vertexColors[2])
+      console.log('cores', v0color);
+      const edges = [
+        {
+          begin: v0,
+          end: v1,
+          rate: ((v1.x - v0.x) / (v1.y - v0.y)),
+          rateR: ((v1color.R - v0color.R) / (v1.y - v0.y)),
+          rateG: ((v1color.G - v0color.G) / (v1.y - v0.y)),
+          rateB: ((v1color.B - v0color.B) / (v1.y - v0.y))
+        },
+        {
+          begin: v1,
+          end: v2,
+          rate: ((v2.x - v1.x) / (v2.y - v1.y)),
+          rateR: ((v2color.R - v1color.R) / (v2.y - v1.y)),
+          rateG: ((v2color.G - v1color.G) / (v2.y - v1.y)),
+          rateB: ((v2color.B - v1color.B) / (v2.y - v1.y))
+        },
+        {
+          begin: v2,
+          end: v0,
+          rate: ((v0.x - v2.x) / (v0.y - v2.y)),
+          rateR: ((v0color.R - v2color.R) / (v0.y - v2.y)),
+          rateG: ((v0color.G - v2color.G) / (v0.y - v2.y)),
+          rateB: ((v0color.B - v2color.B) / (v0.y - v2.y))
+        }
+      ]
+
+      let lastX = 0, lastColor, swaped = false
+      for (let y = v0.y, i = 0; y < v1.y; y++, i++) {
+        let interval = [
+          edges[0].begin.x + edges[0].rate * i,
+          edges[0].begin.x + edges[2].rate * i
+        ]
+        lastX = interval[1]
+        if (interval[1] < interval[0]) {
+          const aux = interval[0]
+          interval[0] = interval[1]
+          interval[1] = aux
+          swaped = true
+        }
+
+        interval[0] = Math.round(interval[0])
+        interval[1] = Math.round(interval[1])
+
+        let color0 = {
+          R: v0color.R + edges[0].rateR * i,
+          G: v0color.G + edges[0].rateG * i,
+          B: v0color.B + edges[0].rateB * i
+        }
+        let color2 = {
+          R: v0color.R + edges[2].rateR * i,
+          G: v0color.G + edges[2].rateG * i,
+          B: v0color.B + edges[2].rateB * i
+        }
+        lastColor = color2
+
+        if (swaped) {
+          const aux = color0
+          color0 = color2
+          color2 = aux
+        }
+
+        const varX = interval[1] - interval[0]
+        const delta = {
+          R: (color2.R - color0.R) / varX,
+          G: (color2.G - color0.G) / varX,
+          B: (color2.B - color0.B) / varX
+        }
+
+        for (let j = interval[0], k = 0; j < interval[1]; j++, k++) {
+          ctx.fillStyle = `rgb(${color0.R + delta.R * k}, ${color0.G + delta.G * k}, ${color0.B + delta.B * k})`
+          ctx.fillRect(j, y, 1, 1)
+        }
+      }
+
+      swaped = false
+      for (let y = v1.y, i = 0; y < v2.y; y++, i++) {
+        let interval = [edges[1].begin.x + edges[1].rate * i, lastX + edges[2].rate * i]
+        if (interval[1] < interval[0]) {
+          const aux = interval[0]
+          interval[0] = interval[1]
+          interval[1] = aux
+          swaped = true
+        }
+        interval[0] = Math.round(interval[0])
+        interval[1] = Math.round(interval[1])
+
+        let color1 = {
+          R: v1color.R + edges[1].rateR * i,
+          G: v1color.G + edges[1].rateG * i,
+          B: v1color.B + edges[1].rateB * i
+        }
+        let color2 = {
+          R: lastColor.R + edges[2].rateR * i,
+          G: lastColor.G + edges[2].rateG * i,
+          B: lastColor.B + edges[2].rateB * i
+        }
+        if (swaped) {
+          const aux = color1
+          color1 = color2
+          color2 = aux
+        }
+
+        const varX = interval[1] - interval[0]
+        const delta = {
+          R: (color2.R - color1.R) / varX,
+          G: (color2.G - color1.G) / varX,
+          B: (color2.B - color1.B) / varX
+        }
+
+        for (let j = interval[0], k = 0; j < interval[1]; j++, k++) {
+          ctx.fillStyle = `rgb(${color1.R + delta.R * k}, ${color1.G + delta.G * k}, ${color1.B + delta.B * k})`
+          ctx.fillRect(j, y, 1, 1)
+        }
+      }
+    }
+    
+  };
+
+  function hexToRgb(hex) {
+    const R = parseInt(hex.substring(1, 3), 16);
+    const G = parseInt(hex.substring(3, 5), 16);
+    const B = parseInt(hex.substring(5, 7), 16);
+    return { R, G, B };
+  }
 
   const handleReset = () => {
     const canvas = canvasRef.current;
@@ -38,7 +175,7 @@ const TriangleCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     drawTriangle(ctx, { vertices, edgeColor });
-  }, [vertices, edgeColor]);
+  }, [vertices, edgeColor, vertexColors]);
 
   const handleCanvasClick = (e) => {
     const canvas = canvasRef.current;
@@ -54,8 +191,12 @@ const TriangleCanvas = () => {
   const handleVertexColorChange = (index, color) => {
     const newVertexColors = [...vertexColors];
     newVertexColors[index] = color;
-    setVertexColors(newVertexColors);
+    setVertexColorsAux(newVertexColors);
   };
+
+  const confirmChange = () => {
+    setVertexColors(vertexColorsAux)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -72,7 +213,7 @@ const TriangleCanvas = () => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        {vertexColors.map((color, index) => (
+        {vertexColorsAux.map((color, index) => (
           <div key={index}>
             <label htmlFor={`vertexColorInput${index + 1}`}>{`Cor do Vértice ${index + 1}:  `}</label>
             <input
@@ -87,6 +228,10 @@ const TriangleCanvas = () => {
       
       <button onClick={handleReset}>
           Apagar triângulo
+      </button>
+      
+      <button onClick={confirmChange}>
+          Pintar triângulo
       </button>
 
       <div style={{ position: 'relative' }}>
