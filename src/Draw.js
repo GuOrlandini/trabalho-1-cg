@@ -6,9 +6,10 @@ const TriangleCanvas = () => {
   const [vertices, setVertices] = useState([]);
   const [triangles, setTriangles] = useState([]);
   const [vertexColors, setVertexColors] = useState(['#000000', '#000000', '#000000']);
-  const [vertexColorsAux, setVertexColorsAux] = useState(['#000000', '#000000', '#000000']);
+  const [vertexColorsAux, setVertexColorsAux] = useState(['#000000', '#000000', '#000000']); // Função auxiliar para o melhor funcionamento da escolha das cores dos vértices
   const [edgeColor, setEdgeColor] = useState('#000000');
 
+  // Função que desenhará o triângulo dentro do contexto do canvas
   const drawTriangle = (ctx, triangle) => {
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     if (triangle.vertices.length === 3) {
@@ -20,21 +21,29 @@ const TriangleCanvas = () => {
 
       ctx.lineWidth = 2;
       ctx.strokeStyle = triangle.edgeColor;
-      ctx.stroke();
       fillPoly(ctx, triangle)
+      ctx.stroke();
     }
   };
 
+  // Função para preencher um polígono triangular em um contexto 2D de canvas usando o algoritmo de preenchimento de scanline.
+  // A função também recebe um array chamado vertexColors, contendo valores hexadecimais de cor para cada vértice.
   const fillPoly = (ctx, triangle) => {
-    if (triangle.vertices && triangle.vertices.length === 3) {
-      triangle.vertices.sort((a, b) => a.y - b.y);
+    if (triangle.vertices && triangle.vertices.length === 3) {        // Verificação de existência do triângulo.
+      triangle.vertices.sort((a, b) => a.y - b.y);                    // Ordena os vértices para o funcionamento do scanline.
 
       let v0 = triangle.vertices[0], v1 = triangle.vertices[1], v2 = triangle.vertices[2]
+      
+      // Converte valores hexadecimais de cor para RGB para cada vértice.
       const v0color = hexToRgb(vertexColors[0])
       const v1color = hexToRgb(vertexColors[1])
       const v2color = hexToRgb(vertexColors[2])
-      console.log('cores', v0color);
-      const edges = [
+
+      // console.log('cores', v0color);
+
+      
+      // Define as arestas do triângulo junto com suas taxas para interpolação de x e cor.
+      const arestas = [     
         {
           begin: v0,
           end: v1,
@@ -61,36 +70,38 @@ const TriangleCanvas = () => {
         }
       ]
 
-      let lastX = 0, lastColor, swaped = false
-      for (let y = v0.y, i = 0; y < v1.y; y++, i++) {
+      let lastX = 0, lastc, inverte = false
+      for (let y = v0.y, i = 0; y < v1.y; y++, i++) { // Loop para preenchimento da parte superior do triângulo.
         let interval = [
-          edges[0].begin.x + edges[0].rate * i,
-          edges[0].begin.x + edges[2].rate * i
+          arestas[0].begin.x + arestas[0].rate * i,
+          arestas[0].begin.x + arestas[2].rate * i
         ]
         lastX = interval[1]
+        // Verifica e ajusta a ordem dos intervalos se necessário.
         if (interval[1] < interval[0]) {
           const aux = interval[0]
           interval[0] = interval[1]
           interval[1] = aux
-          swaped = true
+          inverte = true
         }
 
-        interval[0] = Math.round(interval[0])
-        interval[1] = Math.round(interval[1])
+        interval[0] = Math.floor(interval[0])
+        interval[1] = Math.floor(interval[1])
 
         let color0 = {
-          R: v0color.R + edges[0].rateR * i,
-          G: v0color.G + edges[0].rateG * i,
-          B: v0color.B + edges[0].rateB * i
+          R: v0color.R + arestas[0].rateR * i,
+          G: v0color.G + arestas[0].rateG * i,
+          B: v0color.B + arestas[0].rateB * i
         }
         let color2 = {
-          R: v0color.R + edges[2].rateR * i,
-          G: v0color.G + edges[2].rateG * i,
-          B: v0color.B + edges[2].rateB * i
+          R: v0color.R + arestas[2].rateR * i,
+          G: v0color.G + arestas[2].rateG * i,
+          B: v0color.B + arestas[2].rateB * i
         }
-        lastColor = color2
+        lastc = color2
 
-        if (swaped) {
+        // Troca as cores se a ordem foi ajustada.
+        if (inverte) {
           const aux = color0
           color0 = color2
           color2 = aux
@@ -103,35 +114,39 @@ const TriangleCanvas = () => {
           B: (color2.B - color0.B) / varX
         }
 
+        // Loop para preencher os pixels na linha de varredura.
         for (let j = interval[0], k = 0; j < interval[1]; j++, k++) {
           ctx.fillStyle = `rgb(${color0.R + delta.R * k}, ${color0.G + delta.G * k}, ${color0.B + delta.B * k})`
           ctx.fillRect(j, y, 1, 1)
         }
       }
+      
+      // Reinicializa a variável inverte.
+      inverte = false
 
-      swaped = false
-      for (let y = v1.y, i = 0; y < v2.y; y++, i++) {
-        let interval = [edges[1].begin.x + edges[1].rate * i, lastX + edges[2].rate * i]
+      for (let y = v1.y, i = 0; y < v2.y; y++, i++) {  // Loop para preenchimento da parte inferior do triângulo.
+        let interval = [arestas[1].begin.x + arestas[1].rate * i, lastX + arestas[2].rate * i]
         if (interval[1] < interval[0]) {
           const aux = interval[0]
           interval[0] = interval[1]
           interval[1] = aux
-          swaped = true
+          inverte = true
         }
-        interval[0] = Math.round(interval[0])
-        interval[1] = Math.round(interval[1])
+        interval[0] = Math.floor(interval[0])
+        interval[1] = Math.floor(interval[1])
 
+        
         let color1 = {
-          R: v1color.R + edges[1].rateR * i,
-          G: v1color.G + edges[1].rateG * i,
-          B: v1color.B + edges[1].rateB * i
+          R: v1color.R + arestas[1].rateR * i,
+          G: v1color.G + arestas[1].rateG * i,
+          B: v1color.B + arestas[1].rateB * i
         }
         let color2 = {
-          R: lastColor.R + edges[2].rateR * i,
-          G: lastColor.G + edges[2].rateG * i,
-          B: lastColor.B + edges[2].rateB * i
+          R: lastc.R + arestas[2].rateR * i,
+          G: lastc.G + arestas[2].rateG * i,
+          B: lastc.B + arestas[2].rateB * i
         }
-        if (swaped) {
+        if (inverte) {
           const aux = color1
           color1 = color2
           color2 = aux
@@ -160,6 +175,7 @@ const TriangleCanvas = () => {
     return { R, G, B };
   }
 
+  // Função que apaga o triângulo no canvas e salva na lista
   const handleReset = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -171,12 +187,14 @@ const TriangleCanvas = () => {
     setVertices([]);
   };
 
+  // O hook useEffect d o react atualiza o desenho no canvas sempre que os vértices, a cor da aresta ou as cores dos vértices são modificados.
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     drawTriangle(ctx, { vertices, edgeColor });
   }, [vertices, edgeColor, vertexColors]);
-
+  
+  // Manipula os clicks no canvas e transforma em vértices.
   const handleCanvasClick = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
